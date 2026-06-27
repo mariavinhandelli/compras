@@ -1,10 +1,11 @@
 name: Publicar no GitHub Pages
 
 on:
-  push:
-    branches:
-      - main
-      - gh-pages
+  workflow_run:
+    workflows:
+      - pages build and deployment
+    types:
+      - completed
   workflow_dispatch:
 
 permissions:
