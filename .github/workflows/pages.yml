@@ -1,11 +1,9 @@
 name: Publicar no GitHub Pages
 
 on:
-  workflow_run:
-    workflows:
-      - pages build and deployment
-    types:
-      - completed
+  push:
+    branches:
+      - main
   workflow_dispatch:
 
 permissions:
@@ -24,6 +22,9 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     steps:
+      - name: Aguardar publicacao antiga
+        run: sleep 60
+
       - name: Baixar site compilado
         uses: actions/checkout@v6
         with:
