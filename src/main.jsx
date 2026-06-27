@@ -11,6 +11,7 @@ import {
   ShoppingBag,
   Trash2,
   Undo2,
+  Upload,
   X,
 } from "lucide-react";
 import "./style.css";
@@ -105,7 +106,7 @@ function Button({ children, subtle, ...props }) {
   return (
     <button
       {...props}
-      className={`inline-flex items-center justify-center gap-2 rounded-md border px-3 py-2 text-sm transition ${
+      className={`inline-flex items-center justify-center gap-2 rounded-md border px-3 py-2 text-sm transition disabled:cursor-not-allowed disabled:opacity-50 ${
         subtle ? "border-line bg-white hover:bg-paper" : "border-ink bg-ink text-white hover:bg-black"
       }`}
     >
@@ -123,11 +124,46 @@ function IconButton({ label, children, ...props }) {
 }
 
 function Field(props) {
+  if (props.type === "file") return <FileField name={props.name} />;
+
   return (
     <input
       {...props}
       className="w-full rounded-md border border-line bg-white px-3 py-2 text-sm outline-none focus:border-ink"
     />
+  );
+}
+
+function FileField({ name = "foto" }) {
+  const [fileName, setFileName] = useState("");
+  const inputRef = React.useRef(null);
+
+  useEffect(() => {
+    const form = inputRef.current?.form;
+    const clearFileName = () => setFileName("");
+    form?.addEventListener("reset", clearFileName);
+    return () => form?.removeEventListener("reset", clearFileName);
+  }, []);
+
+  return (
+    <div className="flex min-w-0 items-center gap-2">
+      <label
+        className="grid h-10 w-10 shrink-0 cursor-pointer place-items-center rounded-md border border-line bg-white transition hover:bg-paper"
+        title="Adicionar imagem"
+      >
+        <Upload size={17} />
+        <span className="sr-only">Adicionar imagem</span>
+        <input
+          ref={inputRef}
+          name={name}
+          type="file"
+          accept="image/*"
+          className="sr-only"
+          onChange={(event) => setFileName(event.target.files?.[0]?.name || "")}
+        />
+      </label>
+      {fileName && <span className="min-w-0 truncate text-xs text-neutral-500" title={fileName}>{fileName}</span>}
+    </div>
   );
 }
 
@@ -394,19 +430,27 @@ function Necessarios({ items, reload, categories }) {
 
 function Desejos({ items, reload, categories }) {
   const [editing, setEditing] = useState(null);
+  const [saving, setSaving] = useState(false);
 
   async function add(e) {
     e.preventDefault();
-    const f = new FormData(e.currentTarget);
-    const foto_url = await uploadPhoto(f.get("foto"), "desejos");
-    await saveDb(supabase.from("desejos").insert({
-      nome: f.get("nome"),
-      categoria: f.get("categoria"),
-      link: f.get("link"),
-      foto_url,
-    }), "salvar o item");
-    e.currentTarget.reset();
-    reload();
+    const form = e.currentTarget;
+    const f = new FormData(form);
+    setSaving(true);
+
+    try {
+      const foto_url = await uploadPhoto(f.get("foto"), "desejos");
+      await saveDb(supabase.from("desejos").insert({
+        nome: f.get("nome"),
+        categoria: f.get("categoria"),
+        link: f.get("link"),
+        foto_url,
+      }), "salvar o item");
+      form.reset();
+      await reload();
+    } finally {
+      setSaving(false);
+    }
   }
 
   async function edit(e) {
@@ -443,8 +487,8 @@ function Desejos({ items, reload, categories }) {
         <Field name="nome" placeholder="Nome" required />
         <Select name="categoria" />
         <Field name="link" placeholder="Link de compra" />
-        <Field name="foto" type="file" accept="image/*" />
-        <Button><Plus size={16} />Adicionar</Button>
+        <FileField name="foto" />
+        <Button disabled={saving}>{saving ? <Loader2 className="animate-spin" size={16} /> : <Plus size={16} />}{saving ? "Salvando" : "Adicionar"}</Button>
       </form>
       {Object.entries(groupByCategory(items, categories)).map(([cat, rows]) => rows.length > 0 && (
           <div key={cat}>
@@ -463,7 +507,7 @@ function Desejos({ items, reload, categories }) {
             ))}</div>
           </div>
         ))}
-      {editing && <Modal title="Editar desejo" onClose={() => setEditing(null)}><form onSubmit={edit} className="space-y-3"><Field name="nome" placeholder="Nome" defaultValue={editing.nome} required /><Select name="categoria" defaultValue={editing.categoria || "Outros"} /><Field name="link" placeholder="Link de compra" defaultValue={editing.link || ""} /><Field name="foto" type="file" accept="image/*" /><Button><Check size={16} />Salvar</Button></form></Modal>}
+      {editing && <Modal title="Editar desejo" onClose={() => setEditing(null)}><form onSubmit={edit} className="space-y-3"><Field name="nome" placeholder="Nome" defaultValue={editing.nome} required /><Select name="categoria" defaultValue={editing.categoria || "Outros"} /><Field name="link" placeholder="Link de compra" defaultValue={editing.link || ""} /><FileField name="foto" /><Button><Check size={16} />Salvar</Button></form></Modal>}
     </section>
   );
 }
